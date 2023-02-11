@@ -61,7 +61,7 @@ namespace terminal {
         extern void init(unsigned int x = 0, unsigned int y = 0);
         extern void drawPixel(int x, int y, char character, int foreground = WHITE, int background = BLACK);
         extern char readPixel(int x, int y);
-        extern int readPixelcolor(int x, int y, int type);
+        extern int readPixelColor(int x, int y, int type);
         extern void drawLine(int x1, int y1, int x2, int y2, char character, int foreground = WHITE, int background = BLACK);
         extern void drawRect(int x1, int y1, int x2, int y2, char character, int foreground = WHITE, int background = BLACK);
         extern void fillRect(int x1, int y1, int x2, int y2, char character, int foreground = WHITE, int background = BLACK);
@@ -273,10 +273,12 @@ char terminal::bm::readPixel(int x, int y){
     return *(terminal::internal::pointerOutput <char> (terminal::internal::buffer, x, y));
 }
 
-int terminal::bm::readPixelcolor(int x, int y, int type){
+int terminal::bm::readPixelColor(int x, int y, int type){
     if(!initialized)return 0;
 
-    if(type = FOREGROUND) return *(terminal::internal::pointerOutput <int> (terminal::internal::colorForeground, x, y)); else if(type = BACKGROUND) return *(terminal::internal::pointerOutput <int> (terminal::internal::colorBackground, x, y));
+    if(type == FOREGROUND) return *(terminal::internal::pointerOutput <int> (terminal::internal::colorForeground, x, y)); 
+        else if(type == BACKGROUND) return *(terminal::internal::pointerOutput <int> (terminal::internal::colorBackground, x, y));
+    
     return 0;
 }
 
