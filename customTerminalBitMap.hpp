@@ -1,11 +1,12 @@
 #ifndef customTerminalBitMap_HPP
 #define customTerminalBitMap_HPP
 
-#include "../libraries/customTerminalIO.hpp"
+#include "../libraries/customTerminalIO.hpp" //The only external library this code uses is the customTerminalIO.hpp library for low-level communication with the terminal
 
-#define FOREGROUND 100
+#define FOREGROUND 100 //The FOREGROUND and BACKGROUND keywords are used during readPixelColor function to tell the function what to ask for, wether foreground or background
 #define BACKGROUND 101
 
+//Defining special ASCII characters used to draw fancy menus and such
 #define LIGHT_SHADE                           -1
 #define MEDIUM_SHADE                          -2
 #define DARK_SHADE                            -3
@@ -56,32 +57,37 @@
 #define UPPER_HALF_BLOCK                      -48
 #define BLACK_SQUARE                          -49
 
+//terminal namespace overloading, containing all the functions of the terminal
 namespace terminal {
+
+    //bm namespace which stands for BitMap containing all the functions to draw on the terminal
     namespace bm{
-        extern void init(unsigned int x = 0, unsigned int y = 0);
-        extern void drawPixel(int x, int y, char character, int foreground = WHITE, int background = BLACK);
-        extern char readPixel(int x, int y);
-        extern int readPixelColor(int x, int y, int type);
-        extern void drawLine(int x1, int y1, int x2, int y2, char character, int foreground = WHITE, int background = BLACK);
-        extern void drawRect(int x1, int y1, int x2, int y2, char character, int foreground = WHITE, int background = BLACK);
-        extern void fillRect(int x1, int y1, int x2, int y2, char character, int foreground = WHITE, int background = BLACK);
-        extern void fillScreen(char character, int foreground = WHITE, int background = BLACK);
-        extern void updateDisplay();
-        extern void end();
+        extern void init(unsigned int x = 0, unsigned int y = 0); //Init function initialises the terminal and it specifies by default the length and the height read from the terminal, but it let's you specify it the length and the height
+        extern void drawPixel(int x, int y, char character, int foreground = WHITE, int background = BLACK); //The drawPixel function let's you draw a pixel with x and y coordinates, a certain character and an optional foreground and background color, which by default it's set respectively to WHITE and BLACK (both colors are defined into customTerminalIO.hpp)
+        extern char readPixel(int x, int y); //readPixel returns what does the buffer contain at the coordinates x and y as a char
+        extern int readPixelColor(int x, int y, int type); //readPixelColor returns what is the color of the pixel at position x and y, type defines wether we wanna make it return the FOREGROUND or BACKGROUND (both defined at the start of this code)
+        extern void drawLine(int x1, int y1, int x2, int y2, char character, int foreground = WHITE, int background = BLACK); //The drawLine function draws a line on the terminal and it doesn't have to be straight because it will calculate all the pixels of it
+        extern void drawRect(int x1, int y1, int x2, int y2, char character, int foreground = WHITE, int background = BLACK); //The drawRect function draws a rectangle on the terminal specifying where to draw it (x1, y1, x2, y2), the character to draw it with and the color of it
+        extern void fillRect(int x1, int y1, int x2, int y2, char character, int foreground = WHITE, int background = BLACK); //This function is the same as drawRect it just fills the rectangle with the character with those colors
+        extern void fillScreen(char character, int foreground = WHITE, int background = BLACK); //This function fills the screen with the character with the specified color        
+        extern void updateDisplay(); //This function updates the display fetching the buffer of what's been written on the terminal to the actual terminal printing everything
+        extern void end(); //End function which clears up all the buffers and closes the terminal bitmap clearing and resetting it
 
-        template <typename... ARGS>
-        extern void printText(int x, int y, int foreground, int background, ARGS... args);
+        template <typename... ARGS> //Creating a template which will allow for printText to have a variadic number of any data type of input concatenating it all to a char array printing it out on the buffer char by char
+        extern void printText(int x, int y, int foreground, int background, ARGS... args); //This function prints a text on the terminal at a certain position with a certain color
 
-        template <typename... args>
-        extern void drawMenu(int x1, int y1, int x2, int y2, int colorFB, int colorBB, args... entries);
+        template <typename... args> //Creating a variadic template to use it with drawMenu to allow for a variadic number of entries in the menu
+        extern void drawMenu(int x1, int y1, int x2, int y2, int colorFB, int colorBB, args... entries); //This function is still not finished but it should create a menu with a varying number of entries at certain coords with specific colors
 
-        unsigned int height;
+        unsigned int height; //height and length of the terminal, these variables get filled with init() using terminal::cols() and terminal::rows() in customTerminalIO
         unsigned int length;
 
-        bool initialized = false;
-    }
+        bool initialized = false; //Stores wether the terminal's bitmap is initialized or not
+    } //namespace terminal::bm
 
+    //This namespace contains all the internal functions which will only be accessed by the functions in this code
     namespace internal{
+        //Function used to map a number from a scale to another, used in drawLine
         int map(int input, int min1, int max1, int min2, int max2){
             return (int)((input - min1) * (((max2 - min2) * 1.00000000) / ((max1 - min1) * 1.00000000)) + min2);
         }

@@ -10,10 +10,12 @@
     
     #include <Windows.h>
 #elif defined(__linux__)
-    #include <unistd.h>
-    #include <termios.h>
-    #include <sys/ioctl.h>
-    #include <fcntl.h>
+    //Including linux APIs for low-level communication with the terminal
+
+    #include <unistd.h> //unistd lets us read and write to and from the terminal character to character
+    #include <termios.h> //termios lets us modify specific parameters of the terminal to enter rawMode during reading
+    #include <sys/ioctl.h> //sys/ioctl lets us read the size of the terminal
+    #include <fcntl.h> //fcntl adds some structs we can use to modify parameters of the terminal used in rawMode
 #endif
 
 //Defining an ENDLINE containing a carriage return, this because the rawMode doesn't translate \n into \r\n and and it doesn't carriage return the cursor if we just use '\n' so ENDLINE got defined as "\r\n"
