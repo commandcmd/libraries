@@ -210,7 +210,7 @@ namespace terminal{
 
     //This namespace contains all internal functions which are only used in this header
     namespace internal{
-        char *input;
+        char *input; //This char pointer is used to save a stored string to then store it into a char array defined by the used (see get_str() function)
 
         //Namespace used to manage terminal's rawmode
         namespace rawMode{
@@ -287,7 +287,7 @@ namespace terminal{
             } else return output;
         }//terminal::internal::power();
 
-        //Namespace that contains all the 
+        //Namespace that contains all the code used to convert numbers to char arrays
         namespace convert {
             //Function that returns a single digit of a long double
             int returnSingleDigit(long double input, int digit){
@@ -295,125 +295,160 @@ namespace terminal{
 
                 //If the digit is positive then return the asked digit for the decimal part, otherwise return the asked digit for the whole part
                 if(digit >= 0){
-                    for(int i = 0;i < digit;i++)input /= 10;
+                    for(int i = 0;i < digit;i++)input /= 10; //Divide the input by 10 as many times as the number of digits (if it's positive)
                 } else {
-                    for(int i = 0;i > digit;i--)input *= 10;
+                    for(int i = 0;i > digit;i--)input *= 10; //Else, multiply the input by 10 as many times as the negative number of digits
                 }
 
-                return (int)(input - (unsigned long)(input / 10) * 10); //return the output rounded down
+                return (int)(input - (unsigned long)(input / 10) * 10); //return the output rounded down (since now its got a huge decimal part, delete all of it)
             }//terminal::internal::convert::returnSingleDigit();
 
             //Function used to get the number of digits of a long double input
+            //This is needed so that when print functions have to concatenate variadic arguments into a char array they can use this function to get the size of all the numbers to print into the array and sum them
+            //This is more or less a copy of the toCharArray() function
             int numberOfDigits(long double input){
                 unsigned int nOfDigits; //used to store the number of whole digits
                 unsigned int nOfDecimals; //used to store the number of decimal digits
                 unsigned int nOfTotalDigits; //The sum of the two previous variables
 
-                long double absInput = (input < 0 ? input * -1 : input); //Store the absolute value of the input (invert the input if it's less than 0)
+                long double absInput = (input < 0 ? input * -1 : input); //Store the absolute value of the input (invert the input if it's less than 0 since that can cause problems during reading it)
 
                 for(nOfDigits = 1;true;nOfDigits++){
-                    if(absInput < (absInput >= 0 ? terminal::internal::power(10, nOfDigits) : terminal::internal::power(10, nOfDigits) * -1))break;
+                    //IF the input is less than 10 to the power of the current digits then it means that we found the number of digits of the input and we can break the loop
+                    if(absInput < terminal::internal::power(10, nOfDigits))break;
                 }
-                if(input < 0)nOfDigits++;
+                if(input < 0)nOfDigits++; //Add one digit to the total number of them if the number is negative (for the minus sign)
 
-                nOfTotalDigits = nOfDigits;
+                nOfTotalDigits = nOfDigits; //For now set the number of total digits to the number of digits (now we'll add the decimals)
                         
-                if((long double)input > (long)input && (long double)input < (long)input + 1 || (long double)input < (long)input && (long double)input > (long)input - 1){
-                    nOfDecimals = terminal::out::print_precision;
+                if((long double)absInput > (long)absInput && (long double)absInput < (long)absInput + 1){ //Test if the input number is decimal to see if the (long double) form is higher than the long form (if its higher it means that it has some decimals in the long double to make it higher)
+                    nOfDecimals = terminal::out::print_precision; //Initially the number of decimals is defined by the default print_precision which can be changed
 
-                    for(int i = terminal::out::print_precision + 1;i > 0;i--){
-                        if(returnSingleDigit(input, (i - 1) * -1) == 0)nOfDecimals--;
-                        else break;
+                    for(int i = terminal::out::print_precision + 1;i > 0;i--){ //For loop that sets iterator as print precision and then decreases it till 0
+                        if(returnSingleDigit(input, (i - 1) * -1) == 0)nOfDecimals--; //If the current decimal digit of the number is 0 then decrease the number of decimal digits
+                        else break; //If the current decimal digit is a number then just end the loop and print all the decimal places from here
                     }
 
-                    nOfTotalDigits += ++nOfDecimals;
+                    nOfTotalDigits += ++nOfDecimals + 1; //Add the number of decimals we just got to the total number of digits (add one to it to account for the decimal point)
                 }
 
-                return nOfTotalDigits;
+                return nOfTotalDigits; //Return the total number of digits
             }//terminal::internal::convert::numberOfDigits();
 
+            //This function is used to convert a long double to a char array trough pointers
+            //This function is used in sumAll() to sum all the variadic arguments of the print functinos into a single char array, this gets called when the input of sumAll is a number and converts is to a char array appending it to the output
+            //This is more or less a copy of the numberOfDigits() function just that it stores more stuff along the way to use it during copying into char array
             void toCharArray(long double input, char *output, unsigned int output_length){
-                const char negativeSign = '-';
-                const char decimalSign = '.';
+                const char negativeSign = '-'; //defining a character for the negative number sign
+                const char decimalSign = '.'; //defining a character for the decimal point sign
 
-                unsigned int nOfDigits;
-                unsigned int nOfDecimals;
-                unsigned int nOfTotalDigits;
+                unsigned int nOfDigits; //Used to store the number of whole digits
+                unsigned int nOfDecimals; //Used to store the number of decimal digits
+                unsigned int nOfTotalDigits; //Used to store the total number of digits
                 
-                bool negative = false;
-                bool decimal = false;
+                bool negative = false; //Used to store wether the number is negative or not to append the const char negativeSign at the beginning of the number
+                bool decimal = false; //Used to store wether the number got a decimal part to insert the const char decimalSign into the number
 
-                if(input < 0)negative=true;
-                for(nOfDigits = 1;true;nOfDigits++)if((negative ? input * -1 : input) < ((negative ? input * -1 : input) >= 0 ? terminal::internal::power(10, nOfDigits) : terminal::internal::power(10, nOfDigits) * -1))break;
-                if(negative)nOfDigits++;
-
-                nOfTotalDigits = nOfDigits;
+                if(input < 0)negative=true; //Set negative to true if the number is less than 0
                 
-                if((long double)input > (long)input && (long double)input < (long)input + 1 || (long double)input < (long)input && (long double)input > (long)input - 1){        
-                    nOfDecimals = terminal::out::print_precision;
-                    decimal = true;
+                //Find the number of digits for the whole part of the number
+                for(nOfDigits = 1;true;nOfDigits++)
+                    if( //TL;DR this just tests if the number is less than 10 to the power of the iterator then just breaks the loop knowing the iterator is equal to the number of digits
+                        (negative ? input * -1 : input) < ( //If the absolute value of the input is less than:
+                            input >= 0 //If input is more than zero
+                            ? 
+                                terminal::internal::power(10, nOfDigits) //(...is less than:) The power of 10 to the current iterator of the loop
+                                : 
+                                terminal::internal::power(10, nOfDigits) * -1 //(...is less than:) The inverted power of 10 to the iterator of the loop
+                        )
+                    )break; //If the number exceeds the power between the number of 10 and the iterator then stop the loop
+                
+                if(negative)nOfDigits++; //If the number is negative add 1 to the number of digits to count for the minus sign
 
-                    for(int i = terminal::out::print_precision + 1;i > 0;i--){
-                        if(returnSingleDigit(input, (i - 1) * -1) == 0)nOfDecimals--;
-                        else break;
+                nOfTotalDigits = nOfDigits; //We found the number of digits for the whole part, add it to the total number of digits
+
+                //Find the number of digits for the decimal part of the number
+                if( //TL;DR this just tests if the number got a decimal part
+                    (long double)input > (long)input        //If the long double form of the number is higher than the integer form of the same number
+                        &&                                  //AND
+                    (long double)input < (long)input + 1    //If the long double form of the number is lower than the integer form of the same number + 1
+                    ||                                  //OR (This because the number can be either positive or negative)
+                    (long double)input < (long)input        //If the long double form of the number is lower than the integer form of the same number
+                        &&                                  //AND
+                    (long double)input > (long)input - 1    //If the long double form of the number is higher than the integer form of the same number + 1
+                ){//Then the number has a decimal part
+                    nOfDecimals = terminal::out::print_precision; //We start with the number of decimals equal to the print precision set in the code and we're gonna decrease it.
+                    decimal = true; //Since this code is reached only if the number got a decimal part then set decimal to true
+
+                    for(int i = terminal::out::print_precision + 1;i > 0;i--){ //For loop to start from the last digit (according to print_precision) and going down till we find a digit
+                        if(returnSingleDigit(input, (i - 1) * -1) == 0)nOfDecimals--; //Decrease nOfDecimals if no digits found (if the number at that position is 0)
+                        else break; //If a valid digit is found then close the loop
                     }
 
-                    nOfTotalDigits += nOfDecimals + 1;
+                    nOfTotalDigits += nOfDecimals + 1; //Add the nOfDecimals to the total length of the number (add one to it to account for the decimal point)
                 }
 
-                char converted[nOfTotalDigits];
+                char converted[nOfTotalDigits]; //This char array will contain the converted number
 
-                if(negative)converted[0] = negativeSign;
-                for(int i = (unsigned int)negative;i < nOfDigits;i++)converted[i] = (char)returnSingleDigit(input, nOfDigits - i - 1) + 48;
+                if(negative)converted[0] = negativeSign; //If the number is negative the first char of the array will be the negative sign
+                for(int i = (unsigned int)negative;i < nOfDigits;i++)converted[i] = (char)returnSingleDigit(input, nOfDigits - i - 1) + 48; //Iterate trough the number of whole digits and for every whole digits add to this function the single digit casted to char and converted it into a number
 
-                if(decimal){
-                    converted[nOfDigits] = decimalSign;
-                    for(int i = 1;i <= nOfDecimals;i++)converted[nOfDigits + i] = returnSingleDigit(input, i * -1) + 48;
+                if(decimal){ //If the number got a decimal part
+                    converted[nOfDigits] = decimalSign; //At the end of the whole part (so at the nOfDigits position since thats where the last for loop stopped iterating)
+                    for(int i = 1;i <= nOfDecimals;i++)converted[nOfDigits + i] = returnSingleDigit(input, i * -1) + 48; //to this part add every decimal character of the number
                 }
 
-                for(int i = 0;i <= nOfTotalDigits && i < output_length;i++)*(output + i) = converted[i];
+                for(int i = 0;i <= nOfTotalDigits && i < output_length;i++)*(output + i) = converted[i]; //Then append all the converted stuff to the output trough pointer
 
                 return;
-            }
+            }//terminal::internal::convert::toCharArray();
         }//Namespace terminal::internal::convert;
 
-        namespace concat {
-            int sumAllLength(const char input[]){
-                int inputLength;
-                for(inputLength = 0;input[inputLength] != '\0';inputLength++);
-                return inputLength;
-            }
+        namespace concat { //This namespace contains all the functions used to concatenate the variadic arguments took as an input for print functions
+            //This function is used to get the sum of the length of all the variadic arguments
+            //This is the const char part, since variadic arguments can be of different data types this is the one that gets the length of the const char as an input and will be used to sum it to the total
+            int sumAllLength(const char input[]){ 
+                int inputLength; //Create a variable
+                for(inputLength = 0;input[inputLength] != '\0';inputLength++); //use a for loop to iterate trough the char array till we find a '\0' character indicating the end of it
+                return inputLength; //When the for loop ended and we reached the end of the char array then return the length we found
+            } //terminal::internal::concat::sumAllLength(const char)
 
+            //This overloaded function is used to get the length of a long double number, which will then be summed to the rest of the numbers
+            //It just returns the numberOfDigits function defined in convert namespace
             int sumAllLength(long double input){
                 return terminal::internal::convert::numberOfDigits(input);
-            }
+            } //terminal::internal::concat::sumAllLength(long double)
 
-            void sumAll(const char input[], char *output, bool onlyChar = false){
-                int start;
-                for(start = 0;true;start++)if(*(output + start) == 0)break;
+            //This function is used to copy all the variadic arguments into the char array
+            //This takes a const char array as input and outputs it to an output trough pointer
+            void sumAll(const char input[], char *output, bool onlyChar = false){ 
+                int start; //Create a variable to know where to start copying the const char to the output without overwriting stuff
+                for(start = 0;true;start++)if(*(output + start) == 0)break; //Iterate trough the output array and find where it is empty so that we can copy it
 
-                for(int i = 0;input[i] != '\0';i++)*(output + start + i) = input[i];
+                for(int i = 0;input[i] != '\0';i++)*(output + start + i) = input[i]; //Copy the const char into the output starting from where we found it is empty
 
-                return;
-            }
+                return; //End the function after copying
+            } //terminal::internal::concat::sumAll(const char)
 
+            //This function is an overloading of the other one
+            //What it does is converting a long double number as an input to a char array then it copies it to the output trough pointer
             void sumAll(long double input, char *output, bool onlyChar = false){
-                if(onlyChar)return;
+                if(onlyChar)return; //If the function was asked only to convert char inputs then skip this code
 
-                int char_length = terminal::internal::convert::numberOfDigits(input);
-                char char_input[char_length];
+                int char_length = terminal::internal::convert::numberOfDigits(input); //Set the length of the char array to the length in digits of the number
+                char char_input[char_length]; //Create a char array with the found length
 
-                terminal::internal::convert::toCharArray(input, char_input, char_length);
+                terminal::internal::convert::toCharArray(input, char_input, char_length); //Convert the number to char array and output it to the just created one
 
-                int start;
-                for(start = 0;true;start++)if(*(output + start) == 0)break;
+                int start; //Find the start of the output pointer
+                for(start = 0;true;start++)if(*(output + start) == 0)break; //Iterate trough the output to see where can we start to copy into it
 
-                for(int i = 0;i < char_length;i++)*(output + start + i) = char_input[i];
+                for(int i = 0;i < char_length;i++)*(output + start + i) = char_input[i]; //Copy the array starting from the start we found
 
-                return;
-            }
-        }
-    }
+                return; //Finish the function
+            } //terminal::internal::concat::sumAll(long double)
+        } //namespace terminal::internal::concat;
+    } //namespace terminal::internal;
 } //namespace terminal;
 
 namespace file{
