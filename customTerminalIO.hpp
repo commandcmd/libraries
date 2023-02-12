@@ -16,6 +16,7 @@
     #include <fcntl.h>
 #endif
 
+//Defining an ENDLINE containing a carriage return, this because the rawMode doesn't translate \n into \r\n and and it doesn't carriage return the cursor if we just use '\n' so ENDLINE got defined as "\r\n"
 #define ENDLINE        "\r\n"
 
 #define CTRL_KEY(in) ((in) & 0x1f)  //This code bitwise-ANDs the first 3 bits of "in" to 0 (being 0x1f = 00011111) to check if a key has been pressed alongside as CTRL
@@ -354,13 +355,7 @@ namespace terminal{
                 //Find the number of digits for the whole part of the number
                 for(nOfDigits = 1;true;nOfDigits++)
                     if( //TL;DR this just tests if the number is less than 10 to the power of the iterator then just breaks the loop knowing the iterator is equal to the number of digits
-                        (negative ? input * -1 : input) < ( //If the absolute value of the input is less than:
-                            input >= 0 //If input is more than zero
-                            ? 
-                                terminal::internal::power(10, nOfDigits) //(...is less than:) The power of 10 to the current iterator of the loop
-                                : 
-                                terminal::internal::power(10, nOfDigits) * -1 //(...is less than:) The inverted power of 10 to the iterator of the loop
-                        )
+                        (negative ? input * -1 : input) < (terminal::internal::power(10, nOfDigits)) //If the absolute value of the input is less than the power of 10 to the current iterator of the loop then break it)
                     )break; //If the number exceeds the power between the number of 10 and the iterator then stop the loop
                 
                 if(negative)nOfDigits++; //If the number is negative add 1 to the number of digits to count for the minus sign
@@ -459,80 +454,83 @@ void terminal::in::get_str(bool echo, bool eSI, bool enterBreaks, char endChar, 
     char* output1; //Creating the two arrays that will get updated in real time
     char* output0;
 
-    char current_char;
+    for(char current_char;true;current_char = terminal::in::get_ch(true, echo, true, false, eSI)){ //This loop saves every read character to the current_char variable
+        if(current_char == '\n' && enterBreaks)break; //If the read character is \n and the user asked for enter to break the string then do it
+        if(current_char == endChar && endChar != '\0')break; //If the current read character is equal to the user-defined one then break the string
+        if(terminal::in::str_length > maxLength && maxLength > 0)break; //If the string length exceeds the maximum one defined by the user break the string
 
-    for(int current_char;;current_char = terminal::in::get_ch(true, echo, true, false, eSI)){ //This loop saves every read character inside 
-        if(current_char == '\n' && enterBreaks)break;
-        if(current_char == endChar && endChar != '\0')break;
-        if(terminal::in::str_length > maxLength && maxLength > 0)break;
+        if(current_char == BACKSPACE){ //If the read character is backspace:
+            if(terminal::in::str_length < 1)continue; //If we hit backspace when the string is empty don't do anything
 
-        if(current_char == 127){
-            if(terminal::in::str_length < 1)continue;
+            if(outputN == 0)*(output0 + --terminal::in::str_length) = '\0'; //Clear the last character of the string 0 if outputN is 0
+            else if(outputN == 1)*(output1 + --terminal::in::str_length) = '\0'; //If outputN is 1 then clear the last character of the string 1
 
-            if(outputN == 0)*(output0 + --terminal::in::str_length) = '\0'; 
-            else if(outputN == 1)*(output1 + --terminal::in::str_length) = '\0';
-
+            //After having modified the string move the cursor back, print a whitespace to clear the actual character on screen and then move the cursor back again
             terminal::cur::move_back();
             terminal::out::printch(' ');
             terminal::cur::move_back();
-            continue;
+            
+            continue; //Continue with the loop
         }
 
-        if(outputN == 1){
-            output1 = new char[++terminal::in::str_length];
-            outputN = !outputN;
+        if(outputN == 1){ //If the string 1 is selected:
+            output1 = new char[++terminal::in::str_length]; //create a new char array as the incremented str_length in string 1
+            outputN = !outputN; //Invert outputN (this sets the selected string to 0)
 
-            for(unsigned int i = 0;i < terminal::in::str_length - 1;i++)*(output1 + i) = *(output0 + i);
-            *(output1 + terminal::in::str_length - 1) = current_char;
+            for(unsigned int i = 0;i < terminal::in::str_length - 1;i++)*(output1 + i) = *(output0 + i); //Copy everything from the string 0 to string 1
+            *(output1 + terminal::in::str_length - 1) = current_char; //Set the last character of string 1 as the just read one 
 
-            delete output0;
-        } else if(outputN == 0){
-            output0 = new char[++terminal::in::str_length];
-            outputN = !outputN;
+            delete output0; //Delete the old string 0
+        } else if(outputN == 0){ //But if the string 0 is selected instead
+            output0 = new char[++terminal::in::str_length]; //create a new char array as the incremented str_length in string 0
+            outputN = !outputN; //Invert outputN (this sets the selected string to 1)
 
-            for(unsigned int i = 0;i < terminal::in::str_length - 1;i++)*(output0 + i) = *(output1 + i);
-            *(output0 + terminal::in::str_length - 1) = current_char;
+            for(unsigned int i = 0;i < terminal::in::str_length - 1;i++)*(output0 + i) = *(output1 + i); //Copy everything from the string 1 to string 0
+            *(output0 + terminal::in::str_length - 1) = current_char; //Set the last character of string 0 as the just read one
 
-            delete output1;
+            delete output1; //Delete the old string 1
         }
     }
 
-    delete terminal::internal::input;
-    terminal::internal::input = new char[terminal::in::str_length];
+    delete terminal::internal::input; //Delete the old variable for the input that contains the old stuff
+    terminal::internal::input = new char[terminal::in::str_length]; //Create a new input variable
 
-    for(unsigned int i = 0;i < terminal::in::str_length;i++)*(terminal::internal::input + i) = (outputN ? *(output0 + i) : *(output1 + i));
+    for(unsigned int i = 0;i < terminal::in::str_length;i++)*(terminal::internal::input + i) = (outputN ? *(output0 + i) : *(output1 + i)); //Copy all the stuff from one of the strings to the input variable
 
-    return;
-}
+    return; //end the code
+} //terminal::in::get_str()
 
+//This variable is used to copy terminal::input saved during get_str into a char array output trough pointer
 void terminal::in::store_str(char* output){
-    for(int i = 0;i < terminal::in::str_length;i++)*(output + i) = *(terminal::internal::input + i);
-    *(output + terminal::in::str_length) = '\0';
+    for(int i = 0;i < terminal::in::str_length;i++)*(output + i) = *(terminal::internal::input + i); //Copying terminal::internal::input char array pointer to the output pointer
+    *(output + terminal::in::str_length) = '\0'; //Set the last char of output to \0
 
-    terminal::in::str_length = 0;
-    delete terminal::internal::input;
+    terminal::in::str_length = 0; //Reset str_length
+    delete terminal::internal::input; //Delete the input since we don't need it anymore
 
-    return;
-}
+    return; //End the function
+} //terminal::in::store_str()
 
+//This code gets a single character from the terminal
 char terminal::in::get_ch(bool waitForInput, bool echo, bool rawMode, bool eSC, bool eSI){
-    #if defined(_WIN32)
-    #elif defined(__linux__)
-        if(rawMode)terminal::internal::rawMode::enable(echo, eSI);
+    #if defined(_WIN32) //The windows code still isn't available, i'm going to work on it soon
+    #elif defined(__linux__) //Linux code
+        if(rawMode)terminal::internal::rawMode::enable(echo, eSI); //If rawmode was requested then enable rawmode with the other parameters
 
-        char input[4];
-        for(int i = 0;i < 4;i++)input[i] = 0;
+        char input[4];  //Create a char array containing the 4 characters we're gonna read from the terminal
+                        //We're reading 4 chars from the terminal even tho we're gonna get one char only because the other chars are used for defining special characters like KEY_UP, KEY_DOWN and stuff like that
+        for(int i = 0;i < 4;i++)input[i] = 0; //Reset the just-created array to all zeroes
 
-        if(waitForInput)while(!read(STDIN_FILENO, &input, 4));
-        else read(STDIN_FILENO, &input, 4);
+        if(waitForInput)while(!read(STDIN_FILENO, &input, 4)); //If waitForInput is turned on start a while loop and till the read() function doesn't return don't do anything
+        else read(STDIN_FILENO, &input, 4); //If waitForInput isn't turned on then just return what read from the terminal wether the user pressed a key or not
 
-        if(rawMode)terminal::internal::rawMode::disable();
+        if(rawMode)terminal::internal::rawMode::disable(); //If rawmode was requested we can disable it now
 
-        if(eSC){
-            if(input[0] == '\e' && input[1] == 79){
+        if(eSC){ //If special characters are enabled then look out for them.
+            if(input[0] == '\e' && input[1] == 79){ //If the first char of the char array is an escape character and the second one's code is '79' then the input keyboard is the XFree4 one, start the decoding for that keyboard
                 //Special key decoding for the XFree4 keyboard (default linux terminal keyboard)
 
-                switch(input[2]){
+                switch(input[2]){ //Look for what's on input[2] and return accordingly
                     case 51 : if(input[3] == 126)return KEY_DELETE;
                     case 53 : if(input[3] == 126)return KEY_PGUP;
                     case 54 : if(input[3] == 126)return KEY_PGDOWN;
@@ -571,7 +569,7 @@ char terminal::in::get_ch(bool waitForInput, bool echo, bool rawMode, bool eSC, 
                         }
                     }
                 }
-            } else if(input[0] == '\e' && input[1] == 91){
+            } else if(input[0] == '\e' && input[1] == 91){ //But if the first character is an escape one and the second char's code is '91' then we're working with a linux console / macOS keyboard, we'll start the decoding for it
                 //Special key decoding for the linux console / macOS keyboard
 
                 switch(input[2]){
@@ -619,94 +617,105 @@ char terminal::in::get_ch(bool waitForInput, bool echo, bool rawMode, bool eSC, 
                         }
                     }
                 }
-            } else if(input[0] == '\e' && input[1] == 0)return KEY_ESCAPE; 
-            else return input[0];
-        } else if(!eSC && input[0] >= 32 && input[0] != 127)return input[0]; //ASCII codes 0-31 and 127 are all control characters so we ignore em in the output
-    #endif
+            } else if(input[0] == '\e' && input[1] == 0)return KEY_ESCAPE; //If the first character is an escape one and the second one's code is 0 then the pressed key is ESCAPE so return it
+            else return input[0]; //If no escape characters found or no valid keyboard found then just return the first control character
+        } else if(!eSC && input[0] >= 32 && input[0] != 127)return input[0];    //ASCII codes 0-31 and 127 are all control characters so we ignore em in the output
+                                                                                //We'll just return a normal character if the special characters weren't enabled
+    #endif //End of checking for linux system
 
-    return '\0'; //If special characters were disabled and the input was a special character return 0
-}
+    return '\0'; //If special characters were disabled and the input was a special character return \0
+} //terminal::in::get_ch()
 
-template <typename... args>
+//This function just prints out variadic char array input, it doesn't convert numbers to char array, it just skips them and it doesn't add an ENDLINE at the end of the printed char array so the text won't go to a newline after finishing
+template <typename... args> //Creating a variadic template to make this function work with any data type
 void terminal::out::sprint(args... text){
-    int totSize = (sizeof(text) + ...); 
-    char totText[totSize];
-    for(int i = 0;i < totSize;i++)totText[i] = 0;
+    int totSize = (sizeof(text) + ...);  //Creating a variable called totSize and it will contain the number of characters contained into all the char arrays
+    char totText[totSize]; //Creating a char array as the just found size
+    for(int i = 0;i < totSize;i++)totText[i] = 0; //Clearing all the char array setting all its values to 0
 
+    //Expanding the char arrays into sumAll copying all their content into totText
     using expander = int[]; 
-    (void)expander{0, ((void)terminal::internal::concat::sumAll(text, totText, true), 0)...}; 
+    (void)expander{0, ((void)terminal::internal::concat::sumAll(text, totText, true /*Telling sumAll to not accept numbers and only accept char arrays*/), 0)...}; 
 
     #if defined(_WIN32)
-    #elif defined(__linux__)
+    #elif defined(__linux__) //If linux is defined write totText to terminal
         write(STDOUT_FILENO, totText, totSize);
     #endif
 
-    return;
-}
+    return; //End the function
+} //terminal::out::sprint()
 
-template <typename... args>
+//This function prints out variadic char array input but it doesn't convert numbers into char array, it just ignores them, and it prints an ENDLINE at the end so the cursor goes to the next line
+template <typename... args> //Creating a variadic template so that the function accepts any number of any type of input
 void terminal::out::sprintln(args... text){
-    int totSize = (sizeof(text) + ...); 
-    char totText[totSize];
-    for(int i = 0;i < totSize;i++)totText[i] = 0;
+    int totSize = (sizeof(text) + ...); //Creating a variable called totSize and it will contain the number of characters contained into all the char arrays
+    char totText[totSize]; //Creating a char array as the just found size
+    for(int i = 0;i < totSize;i++)totText[i] = 0; //Clearing all the char array setting all its values to 0
 
+    //Expanding the char arrays into sumAll copying all their content into totText
     using expander = int[]; 
-    (void)expander{0, ((void)terminal::internal::concat::sumAll(text, totText, true), 0)...}; 
+    (void)expander{0, ((void)terminal::internal::concat::sumAll(text, totText, true/*Telling sumAll to not accept numbers and only accept char arrays*/), 0)...}; 
 
     #if defined(_WIN32)
-    #elif defined(__linux__)
+    #elif defined(__linux__)//If linux is defined write totText to terminal and add an ENDLINE at the end
         write(STDOUT_FILENO, totText, totSize);
         write(STDOUT_FILENO, ENDLINE, 2);
     #endif
 
-    return;
-}
+    return; //End the function
+} //terminal::out::sprintln()
 
-template <typename... args>
-void terminal::out::print(args... text){
-    int totSize = (terminal::internal::concat::sumAllLength(text) + ...); 
-    char totText[totSize];
-    for(int i = 0;i < totSize;i++)totText[i] = 0;
+//This function prints out a char array to the terminal taking as an input any data type in a variadic argument form converting all of it into char array printing out it to the terminal
+template <typename... args> //Creating a variadic template to accept any number of any data type of input
+void terminal::out::print(args... text){ //Creating the function using the variadic template as an input
+    int totSize = (terminal::internal::concat::sumAllLength(text) + ...); //Summing the size in characters of all the values of the variadic arguments
+    char totText[totSize]; //Creating a char array that will contain all the characters of the variadic arguments
+    for(int i = 0;i < totSize;i++)totText[i] = 0; //Clearing the array by filling it with zeroes
 
+    //Expanding all the arguments into sumAll to write them into totText
     using expander = int[]; 
     (void)expander{0, ((void)terminal::internal::concat::sumAll(text, totText), 0)...};
 
     #if defined(_WIN32)
-    #elif defined(__linux__)
-        write(STDOUT_FILENO, totText, totSize);
+    #elif defined(__linux__) //If the code is running on linux
+        write(STDOUT_FILENO, totText, totSize); //Write the contents of totText[] to the terminal
     #endif
 
-    return;
-}
+    return; //End the funcion
+} //terminal::out::print()
 
-template <typename... args>
-void terminal::out::println(args... text){
-    int totSize = (terminal::internal::concat::sumAllLength(text) + ...);
-    char totText[totSize];
-    for(int i = 0;i < totSize;i++)totText[i] = 0;
+//This function takes any number of any data type of input concatening all of it together into a single char array printing it out to the terminal with a newline at the end
+template <typename... args> //Creating a variadic template to accept any number of any data type of input
+void terminal::out::println(args... text){ //Creating the function using the variadic template as an input
+    int totSize = (terminal::internal::concat::sumAllLength(text) + ...);//Summing the size in characters of all the values of the variadic arguments
+    char totText[totSize];//Creating a char array that will contain all the characters of the variadic arguments
+    for(int i = 0;i < totSize;i++)totText[i] = 0;//Clearing the array by filling it with zeroes
 
+    //Expanding all the arguments into sumAll to write them into totText
     using expander = int[];
     (void)expander{0, ((void)terminal::internal::concat::sumAll(text, totText), 0)...}; 
 
     #if defined(_WIN32)
-    #elif defined(__linux__)
-        write(STDOUT_FILENO, totText, totSize);
-        write(STDOUT_FILENO, ENDLINE, 2);
+    #elif defined(__linux__)//If the code is running on linux
+        write(STDOUT_FILENO, totText, totSize); //Write the contents of totText[] to the terminal
+        write(STDOUT_FILENO, ENDLINE, 2); //Add an ENDLINE at the end to go to a newline
     #endif
 
-    return;
-}
+    return; //End the function
+} // terminal::out::println()
 
+//This function prints a single character to the terminal taking a char as an input
 void terminal::out::printch(char input){
-    char output[1];
-    output[0] = input;
+    //Converting the input char to a char array, this because the write() function for the buffer takes a char array modifying it trough pointer and it doesn't accept a normal char as input and we have to pass it trough a char array
+    char output[1]; //Creating a char array to use as an output
+    output[0] = input; //Setting the first char of the array to the input of the function
 
     #if defined(_WIN32)
-    #elif defined(__linux__)
-        write(STDOUT_FILENO, output, 1);
+    #elif defined(__linux__) //If we're on linux
+        write(STDOUT_FILENO, output, 1); //Writing the char passed to char array to the terminal
     #endif
 
-    return;
-}
+    return; //End the function
+} //terminal::out::printch()
 
-#endif
+#endif //ifndef customTerminalIO_HPP
