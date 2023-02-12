@@ -451,21 +451,17 @@ namespace terminal{
     } //namespace terminal::internal;
 } //namespace terminal;
 
-namespace file{
-    void open(const char name[]){
-        
-    }
-}
 
+//This function is used to get a string and temporarily storing it into a char pointer defined in terminal::internal
 void terminal::in::get_str(bool echo, bool eSI, bool enterBreaks, char endChar, unsigned int maxLength){
-    bool outputN = false;
+    bool outputN = false; //Since this code uses two different char arrays and copies between them to update them, this variable stores what array we're currently using
 
-    char* output1;
+    char* output1; //Creating the two arrays that will get updated in real time
     char* output0;
 
-    for(;;){
-        char current_char = terminal::in::get_ch(true, echo, true, false, eSI);
+    char current_char;
 
+    for(int current_char;;current_char = terminal::in::get_ch(true, echo, true, false, eSI)){ //This loop saves every read character inside 
         if(current_char == '\n' && enterBreaks)break;
         if(current_char == endChar && endChar != '\0')break;
         if(terminal::in::str_length > maxLength && maxLength > 0)break;
