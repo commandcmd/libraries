@@ -275,11 +275,20 @@ void terminal::bm::updateDisplay(bool optimized){
 void terminal::bm::drawPixel(int x, int y, char character, int foreground, int background){ 
     if(!initialized)return; //If the terminal hasn't been initialised then skip the function
 
-    *(terminal::internal::pointerOutput <bool> (terminal::internal::bufferChanged, x, y)) = true; //Tell the updatedisplay fuction that the current pixel changed
+    //If there's any change to any buffer then set the bufferChanged for the current position to true so that it updates the current pixel during updateDisplay
+    //This makes it so that if we write the same pixel twice it won't actually update it twice
+    if(                                                                                                      //If
+        *(terminal::internal::pointerOutput <char> (terminal::internal::buffer, x, y)) != character          //The text we're trying to write is different than what's already there
+            ||                                                                                               //OR
+        *(terminal::internal::pointerOutput <int> (terminal::internal::colorForeground, x, y)) != foreground //The foreground color of the text we're trying to write is different than what's already there
+            ||                                                                                               //OR 
+        *(terminal::internal::pointerOutput <int> (terminal::internal::colorBackground, x, y)) != background //The background color of the text we're trying to write is different than what's already there
+    )                                                                                                        //Then:
+        *(terminal::internal::pointerOutput <bool> (terminal::internal::bufferChanged, x, y)) = true;        //Update the current pixel
 
-    *(terminal::internal::pointerOutput <char> (terminal::internal::buffer, x, y)) = character; //Edit the buffer by adding the specified character to the specified position
-
-    *(terminal::internal::pointerOutput <int> (terminal::internal::colorForeground, x, y)) = foreground; //Edit the color buffer by adding at this position the specified colors
+    //Update the buffers at the specified position to the specified values
+    *(terminal::internal::pointerOutput <char> (terminal::internal::buffer, x, y)) = character;
+    *(terminal::internal::pointerOutput <int> (terminal::internal::colorForeground, x, y)) = foreground;
     *(terminal::internal::pointerOutput <int> (terminal::internal::colorBackground, x, y)) = background;
 
     return; //End of the function
