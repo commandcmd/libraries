@@ -418,6 +418,7 @@ namespace terminal{
 
             //This function is used to copy all the variadic arguments into the char array
             //This takes a const char array as input and outputs it to an output trough pointer
+            //We don't use the argument onlyChar here cause it's only needed in the overloading later when the input is an int
             void sumAll(const char input[], char *output, bool onlyChar = false){ 
                 int start; //Create a variable to know where to start copying the const char to the output without overwriting stuff
                 for(start = 0;true;start++)if(*(output + start) == 0)break; //Iterate trough the output array and find where it is empty so that we can copy it
